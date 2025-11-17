@@ -483,7 +483,7 @@ Contributions are welcome! Please:
 
 ## License
 
-Copyright © 2025 Agileware Inc.
+Copyright © 2025 Stoyan Zhekov <zh@zhware.net>
 
 This project is available for use under the MIT License.
 
