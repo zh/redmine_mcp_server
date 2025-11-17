@@ -27,14 +27,14 @@ Some MCP tools require the **Redmine Extended API plugin** for advanced function
 **Installation**:
 ```bash
 cd /path/to/redmine/plugins
-git clone https://github.com/agileware/redmine_extended_api.git
+git clone https://github.com/zh/redmine_extended_api.git
 cd /path/to/redmine
 bundle install
 bundle exec rake redmine:plugins:migrate RAILS_ENV=production
 systemctl restart redmine
 ```
 
-See [redmine_extended_api](https://github.com/agileware/redmine_extended_api) for details.
+See [redmine_extended_api](https://github.com/zh/redmine_extended_api) for details.
 
 **Note**: All other MCP tools work with standard Redmine REST API (no plugins required).
 
@@ -497,7 +497,7 @@ This project is available for use under the MIT License.
 ## Support
 
 For issues, questions, or contributions:
-- GitHub Issues: [Create an issue](https://github.com/agileware/redmine_mcp_server/issues)
+- GitHub Issues: [Create an issue](https://github.com/zh/redmine_mcp_server/issues)
 - Documentation: [Redmine REST API](https://www.redmine.org/projects/redmine/wiki/rest_api)
 
 ## Roadmap
