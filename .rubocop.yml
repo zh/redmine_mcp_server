@@ -1,0 +1,16 @@
+# RuboCop configuration
+AllCops:
+  TargetRubyVersion: 3.1
+  NewCops: enable
+
+# Disable Rails/TimeZone since we don't use ActiveSupport
+Rails/TimeZone:
+  Enabled: false
+
+# Allow both > 0 and .positive? styles
+Style/NumericPredicate:
+  Enabled: false
+
+# Allow string arguments to instance_double (for generic mocks)
+RSpec/VerifiedDoubleReference:
+  Enabled: false

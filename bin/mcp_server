@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# MCP Server - STDIO Mode Entry Point
+# This executable starts the Redmine MCP server in STDIO mode for Claude Desktop/Code
+# Protocol: MCP (Model Context Protocol) 2025-06-18 via JSON-RPC 2.0 over STDIO
+
+require 'bundler/setup'
+require 'dotenv/load'
+
+# Set STDIO mode before requiring server
+ENV['MCP_MODE'] = 'stdio'
+
+require_relative '../lib/redmine_mcp_server'
+require_relative '../lib/mcp_server'
+require_relative '../lib/mcp_protocol_adapter'
+require_relative '../lib/transports/stdio_transport'
+require_relative '../lib/jsonrpc_handler'
+
+# Use the logger that was already configured in lib/redmine_mcp_server.rb
+# (It's already pointing to stderr because ENV['MCP_MODE'] was set to 'stdio')
+logger = RedmineMcpServer.logger
+
+begin
+  logger.info 'Starting Redmine MCP Server in STDIO mode'
+  logger.info "Protocol: MCP 2025-06-18 (JSON-RPC 2.0)"
+
+  # Use the already-initialized MCP server from RedmineMcpServer module
+  mcp_server = RedmineMcpServer.mcp_server
+
+  # Create protocol adapter
+  protocol_adapter = RedmineMcpServer::McpProtocolAdapter.new(mcp_server, logger)
+
+  # Create and start STDIO transport
+  transport = RedmineMcpServer::Transports::StdioTransport.new(protocol_adapter, logger)
+
+  logger.info 'STDIO transport ready - waiting for initialize message'
+  transport.start
+
+  logger.info 'Server shutdown complete'
+  exit 0
+
+rescue Interrupt
+  logger.info 'Received interrupt signal - shutting down gracefully'
+  exit 0
+rescue StandardError => e
+  logger.error "Fatal error: #{e.message}"
+  logger.error e.backtrace.join("\n")
+  exit 1
+end
