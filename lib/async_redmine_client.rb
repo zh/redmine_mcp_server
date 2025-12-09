@@ -44,12 +44,29 @@ module RedmineMcpServer
     # Maximum number of pages to fetch in paginate method (prevents OOM)
     MAX_PAGES = 100
 
-    attr_reader :base_url
+    # Authentication types supported
+    AUTH_TYPE_API_KEY = :api_key
+    AUTH_TYPE_BEARER = :bearer
 
-    def initialize(base_url, api_key, logger: nil, timeout: nil, read_timeout: nil)
+    attr_reader :base_url, :auth_type
+
+    # Initialize a new Redmine client
+    # @param base_url [String] Redmine instance base URL
+    # @param auth_token [String] API key or Bearer token (depending on auth_type)
+    # @param auth_type [Symbol] :api_key (default) or :bearer for OAuth tokens
+    # @param logger [Logger] Logger instance
+    # @param timeout [Integer] Connection timeout in seconds
+    # @param read_timeout [Integer] Read timeout in seconds
+    def initialize(base_url, auth_token, auth_type: AUTH_TYPE_API_KEY, logger: nil, timeout: nil, read_timeout: nil)
       @base_url = normalize_url(base_url)
-      @api_key = api_key
+      @auth_token = auth_token
+      @auth_type = auth_type
       @logger = logger || RedmineMcpServer.logger
+
+      # Validate auth_type
+      unless [AUTH_TYPE_API_KEY, AUTH_TYPE_BEARER].include?(@auth_type)
+        raise ArgumentError, "Invalid auth_type: #{auth_type}. Must be :api_key or :bearer"
+      end
 
       # Timeout configuration
       @timeout = timeout || ENV.fetch('HTTP_TIMEOUT', '30').to_i
@@ -219,12 +236,21 @@ module RedmineMcpServer
     end
 
     def build_headers
-      [
-        ['x-redmine-api-key', @api_key],
+      headers = [
         ['accept', 'application/json'],
         ['content-type', 'application/json'],
         ['accept-encoding', 'gzip, deflate']
       ]
+
+      # Add authentication header based on auth_type
+      case @auth_type
+      when AUTH_TYPE_API_KEY
+        headers.unshift(['x-redmine-api-key', @auth_token])
+      when AUTH_TYPE_BEARER
+        headers.unshift(['authorization', "Bearer #{@auth_token}"])
+      end
+
+      headers
     end
 
     def build_url(path, params)

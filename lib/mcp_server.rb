@@ -4,6 +4,8 @@ require 'securerandom'
 require_relative 'metrics/collector'
 require_relative 'metrics/middleware'
 require_relative 'middleware/request_id'
+require_relative 'middleware/oauth_authenticator'
+require_relative 'chatgpt'
 
 module RedmineMcpServer
   # MCP Server implementation
@@ -110,6 +112,11 @@ module RedmineMcpServer
       mcp_server = self
       metrics_collector = @metrics_collector
 
+      # Initialize ChatGPT components if enabled
+      rest_api_router = ChatGPT::RestApiRouter.new(mcp_server) if ChatGPT.enabled?
+      openapi_generator = ChatGPT::OpenApiGenerator.new(mcp_server) if ChatGPT.enabled?
+      manifest_generator = ChatGPT::ManifestGenerator.new if ChatGPT.enabled?
+
       app = proc do |env|
         request = Rack::Request.new(env)
 
@@ -123,6 +130,7 @@ module RedmineMcpServer
                                                                              tools_count: mcp_server.tools.size,
                                                                              resources_count: mcp_server.resources.size,
                                                                              redmine_url: RedmineMcpServer.config[:redmine_url],
+                                                                             chatgpt_mode: ChatGPT.enabled?,
                                                                              timestamp: Time.now.iso8601
                                                                            })]]
 
@@ -168,12 +176,39 @@ module RedmineMcpServer
                                                                              slow_requests: metrics_collector.slow_requests_summary
                                                                            })]]
 
+          # ChatGPT Actions endpoints (only when enabled)
+          when ['GET', '/.well-known/ai-plugin.json']
+            if manifest_generator
+              [200, { 'Content-Type' => 'application/json' }, [manifest_generator.to_json]]
+            else
+              [404, { 'Content-Type' => 'application/json' }, [JSON.generate({ error: 'ChatGPT mode not enabled' })]]
+            end
+
+          when ['GET', '/api/v1/openapi.json']
+            if openapi_generator
+              [200, { 'Content-Type' => 'application/json' }, [openapi_generator.to_json]]
+            else
+              [404, { 'Content-Type' => 'application/json' }, [JSON.generate({ error: 'ChatGPT mode not enabled' })]]
+            end
+
+          when ['GET', '/api/v1/openapi.yaml']
+            if openapi_generator
+              [200, { 'Content-Type' => 'application/x-yaml' }, [openapi_generator.to_yaml]]
+            else
+              [404, { 'Content-Type' => 'application/json' }, [JSON.generate({ error: 'ChatGPT mode not enabled' })]]
+            end
+
           else
-            [404, { 'Content-Type' => 'application/json' }, [JSON.generate({
-                                                                             error: 'Not Found',
-                                                                             path: request.path,
-                                                                             method: request.request_method
-                                                                           })]]
+            # Try ChatGPT REST API router for /api/v1/* paths
+            if rest_api_router&.handles?(request.path)
+              rest_api_router.route(request, env)
+            else
+              [404, { 'Content-Type' => 'application/json' }, [JSON.generate({
+                                                                               error: 'Not Found',
+                                                                               path: request.path,
+                                                                               method: request.request_method
+                                                                             })]]
+            end
           end
         rescue JSON::ParserError => e
           error_id = SecureRandom.uuid
@@ -206,6 +241,10 @@ module RedmineMcpServer
 
       # Wrap app with middleware (order matters: outer to inner)
       app = Metrics::Middleware.new(app, metrics_collector)
+
+      # Add OAuth middleware for ChatGPT mode
+      app = Middleware::OAuthAuthenticator.new(app, require_auth: ChatGPT.config[:require_auth]) if ChatGPT.enabled?
+
       Middleware::RequestId.new(app)
     end
   end
